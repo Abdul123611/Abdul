@@ -1,0 +1,8 @@
+{
+  "name": "ABDUL AI Youtube Automation",
+  "description": "A comprehensive AI-driven YouTube automation tool for scriptwriting, metadata generation, and cinematic scene visualization.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
