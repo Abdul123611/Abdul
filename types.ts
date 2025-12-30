@@ -10,10 +10,14 @@ export interface Scene {
   text: string;
   visualPrompt: string;
   imageUrl?: string;
+  videoUrl?: string;
   isGenerating?: boolean;
+  isVideoGenerating?: boolean;
 }
 
 export interface AutomationPackage {
+  id: string;
+  timestamp: number;
   script: string;
   voiceOver: string;
   scenes: Scene[];

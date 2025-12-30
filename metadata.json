@@ -1,6 +1,6 @@
 {
-  "name": "ABDUL AI Youtube Automation",
-  "description": "A comprehensive AI-driven YouTube automation tool for scriptwriting, metadata generation, and cinematic scene visualization.",
+  "name": "TubeMagic Pro AI Studio",
+  "description": "Professional-grade YouTube automation suite with script generation and multi-modal asset production.",
   "requestFramePermissions": [
     "camera",
     "microphone"

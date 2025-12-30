@@ -1,12 +1,17 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { AutomationPackage, ImageSize, Scene } from "../types";
+import { AutomationPackage, ImageSize, Scene, ChatMessage } from "../types";
 
-const SYSTEM_INSTRUCTION = `You are an all-in-one AI YouTube automation system. 
-Your task is to create a COMPLETE, ORIGINAL, and YOUTUBE-SAFE video package from ONE user prompt.
-Always return response in JSON format matching the AutomationPackage interface.
-Return scenes as an array of objects where each object has "text" (the sentence from the script) and "visualPrompt" (cinematic, vertical 9:16 description).
-Follow the specific format for script (45-60s), VO instructions with tone tags, and punchy subtitles.`;
+const SYSTEM_INSTRUCTION = `You are the core engine of TubeMagic Pro, a world-class YouTube automation suite.
+Your task is to convert a user idea into a complete production package.
+
+STRICT REQUIREMENTS:
+1. SCRIPT: 45-60s, punchy hook, engaging narrative.
+2. VO: Clean text with bracketed tone cues like [HOOK - energetic].
+3. SCENES: One scene per sentence. Cinematic 9:16 visual prompts.
+4. SEO: Title under 60 chars, rich description, trending tags and hashtags.
+
+Output must be valid JSON matching the AutomationPackage schema.`;
 
 export class GeminiService {
   private getClient() {
@@ -17,7 +22,7 @@ export class GeminiService {
     const ai = this.getClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: userPrompt,
+      contents: `Generate a full production package for: ${userPrompt}`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -50,7 +55,8 @@ export class GeminiService {
     });
 
     const data = JSON.parse(response.text || '{}');
-    // Map scenes with IDs
+    data.id = crypto.randomUUID();
+    data.timestamp = Date.now();
     data.scenes = data.scenes.map((s: any, i: number) => ({
       ...s,
       id: `scene-${i}`
@@ -63,7 +69,7 @@ export class GeminiService {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
       contents: {
-        parts: [{ text: `${prompt}. Cinematic, hyper-realistic, high resolution, professional lighting, 9:16 vertical aspect ratio.` }]
+        parts: [{ text: `${prompt}. Cinematic 9:16 vertical, hyper-realistic, 8k resolution, professional color grading.` }]
       },
       config: {
         imageConfig: {
@@ -74,30 +80,53 @@ export class GeminiService {
     });
 
     const candidate = response.candidates?.[0];
-    if (!candidate) throw new Error("No candidates returned from image generation.");
+    if (!candidate) throw new Error("No image generated.");
 
     for (const part of candidate.content.parts) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
+      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
     }
-    throw new Error("No image data found in response.");
+    throw new Error("Image data missing in response.");
   }
 
-  async chat(message: string, history: { role: 'user' | 'model', text: string }[]): Promise<string> {
+  async generateVideo(prompt: string): Promise<string> {
+    const ai = this.getClient();
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: `${prompt}. Cinematic slow motion, 9:16 vertical, high quality.`,
+      config: {
+        numberOfVideos: 1,
+        resolution: '720p',
+        aspectRatio: '9:16'
+      }
+    });
+
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      operation = await ai.operations.getVideosOperation({ operation: operation });
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (!downloadLink) throw new Error("Video URI not found.");
+    
+    const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  async chat(message: string, history: ChatMessage[]): Promise<string> {
     const ai = this.getClient();
     const chat = ai.chats.create({
       model: 'gemini-3-pro-preview',
       config: {
-        systemInstruction: "You are the TubeMagic AI assistant. Help the user refine their YouTube automation project. Provide expert advice on content strategy, SEO, and visual storytelling."
-      }
+        systemInstruction: "You are the TubeMagic Studio Assistant. Help the creator refine their script, visual style, or SEO strategy."
+      },
+      history: history.map(h => ({
+        role: h.role,
+        parts: [{ text: h.text }]
+      }))
     });
-
-    // Note: sendMessage only takes a message string. For history, it needs to be pre-fed if using the SDK normally, 
-    // but we'll stick to a simple chat for now or use history in the create call if the SDK supported it.
-    // For simplicity with this SDK version, we send the message.
     const response = await chat.sendMessage({ message });
-    return response.text || "Sorry, I couldn't generate a response.";
+    return response.text || "I'm having trouble connecting right now.";
   }
 }
 
